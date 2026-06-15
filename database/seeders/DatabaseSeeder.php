@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             AdminUserSeeder::class,
             FoodExchangeCategorySeeder::class,
+            FoodExchangeItemSeeder::class,  // 550 FNRI FEL items (4th Ed. 2020)
             SystemSettingSeeder::class,
         ]);
     }
