@@ -1,13 +1,18 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\Admin\DashboardController;
 use App\Http\Controllers\Api\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\Client\AppointmentController as ClientAppointmentController;
 use App\Http\Controllers\Api\Client\PaymentController;
 use App\Http\Controllers\Api\Client\PreConsultationScreeningController;
+use App\Http\Controllers\Api\Client\ProgressRecordController as ClientProgressController;
+use App\Http\Controllers\Api\Client\ReviewController;
 use App\Http\Controllers\Api\Client\RndMatchController;
 use App\Http\Controllers\Api\Rnd\AppointmentController as RndAppointmentController;
+use App\Http\Controllers\Api\Rnd\AvailabilityController;
 use App\Http\Controllers\Api\Rnd\NcpController;
+use App\Http\Controllers\Api\Rnd\ProgressRecordController as RndProgressController;
 use App\Http\Controllers\Api\Shared\FoodExchangeController;
 use App\Http\Controllers\Api\Shared\MessageController;
 use Illuminate\Support\Facades\Route;
@@ -73,6 +78,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // 3. ADMIN ONLY
     // ============================================================
     Route::middleware('role:admin')->prefix('admin')->group(function () {
+        // Dashboard stats
+        Route::get('/dashboard',                          [DashboardController::class, 'index']);
+        Route::get('/dashboard/revenue-chart',            [DashboardController::class, 'revenueChart']);
+        Route::get('/dashboard/appointment-chart',        [DashboardController::class, 'appointmentChart']);
+        Route::get('/dashboard/recent-activity',          [DashboardController::class, 'recentActivity']);
+        Route::get('/dashboard/top-rnds',                 [DashboardController::class, 'topRnds']);
+
         // User management
         Route::get('/users',                      [AdminUserController::class, 'index']);
         Route::get('/users/{id}',                 [AdminUserController::class, 'show']);
@@ -98,6 +110,21 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/ncp',                                [NcpController::class, 'store']);
         Route::put('/ncp/{id}',                            [NcpController::class, 'update']);
         Route::patch('/ncp/{id}/finalize',                 [NcpController::class, 'finalize']);
+
+        // Progress Records
+        Route::get('/relationships/{relationshipId}/progress',         [RndProgressController::class, 'index']);
+        Route::get('/relationships/{relationshipId}/progress/summary', [RndProgressController::class, 'summary']);
+        Route::post('/relationships/{relationshipId}/progress',        [RndProgressController::class, 'store']);
+        Route::get('/progress/{id}',                                   [RndProgressController::class, 'show']);
+        Route::put('/progress/{id}',                                   [RndProgressController::class, 'update']);
+        Route::delete('/progress/{id}',                                [RndProgressController::class, 'destroy']);
+
+        // Availability Schedule
+        Route::get('/availability',              [AvailabilityController::class, 'index']);
+        Route::post('/availability',             [AvailabilityController::class, 'store']);
+        Route::put('/availability/{id}',         [AvailabilityController::class, 'update']);
+        Route::delete('/availability/{id}',      [AvailabilityController::class, 'destroy']);
+        Route::post('/availability/block-day',   [AvailabilityController::class, 'blockDay']);
     });
 
     // ============================================================
@@ -109,15 +136,29 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/rnds/{rndId}',                  [RndMatchController::class, 'show']);
         Route::post('/rnds/{rndId}/request',         [RndMatchController::class, 'requestRelationship']);
 
+        // RND availability (client reads RND's schedule for booking)
+        Route::get('/rnds/{rndId}/availability',     [AvailabilityController::class, 'active']);
+
         // Appointments
         Route::get('/appointments',                  [ClientAppointmentController::class, 'index']);
         Route::get('/appointments/{id}',             [ClientAppointmentController::class, 'show']);
         Route::post('/appointments',                 [ClientAppointmentController::class, 'store']);
         Route::patch('/appointments/{id}/cancel',    [ClientAppointmentController::class, 'cancel']);
 
+        // Reviews
+        Route::post('/appointments/{appointmentId}/review',  [ReviewController::class, 'store']);
+        Route::get('/appointments/{appointmentId}/review',   [ReviewController::class, 'myReview']);
+        Route::put('/reviews/{reviewId}',                    [ReviewController::class, 'update']);
+        Route::delete('/reviews/{reviewId}',                 [ReviewController::class, 'destroy']);
+        Route::get('/rnds/{rndId}/reviews',                  [ReviewController::class, 'rndReviews']);
+
         // Pre-consultation screening
         Route::post('/screening',                    [PreConsultationScreeningController::class, 'store']);
         Route::get('/screening/{appointmentId}',     [PreConsultationScreeningController::class, 'show']);
+
+        // Progress Records (read-only for client)
+        Route::get('/progress',                                               [ClientProgressController::class, 'myProgress']);
+        Route::get('/relationships/{relationshipId}/progress',                [ClientProgressController::class, 'index']);
 
         // Payments
         Route::post('/invoices/{invoiceId}/pay',     [PaymentController::class, 'initiatePayment']);

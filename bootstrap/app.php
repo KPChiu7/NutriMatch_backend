@@ -23,32 +23,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        // Render all exceptions as JSON for the API
+        // Always return JSON for API requests
         $exceptions->shouldRenderJsonWhen(function (Request $request) {
             return $request->is('api/*') || $request->expectsJson();
         });
 
-        // Return clean 404 JSON instead of HTML for model-not-found
-        $exceptions->render(function (
-            \Illuminate\Database\Eloquent\ModelNotFoundException $e,
-            Request $request
-        ) {
-            return response()->json([
-                'message' => 'The requested resource was not found.',
-            ], 404);
-        });
-
-        // Clean 403 for authorization failures
-        $exceptions->render(function (
-            \Illuminate\Auth\Access\AuthorizationException $e,
-            Request $request
-        ) {
-            return response()->json([
-                'message' => 'You are not authorized to perform this action.',
-            ], 403);
-        });
-
-        // Clean 401 for unauthenticated access
+        // Fix: prevent redirect to 'login' route (does not exist in API-only app)
         $exceptions->render(function (
             \Illuminate\Auth\AuthenticationException $e,
             Request $request
@@ -58,7 +38,27 @@ return Application::configure(basePath: dirname(__DIR__))
             ], 401);
         });
 
-        // Clean 422 for validation errors
+        // Clean 404 JSON
+        $exceptions->render(function (
+            \Illuminate\Database\Eloquent\ModelNotFoundException $e,
+            Request $request
+        ) {
+            return response()->json([
+                'message' => 'The requested resource was not found.',
+            ], 404);
+        });
+
+        // Clean 403 JSON
+        $exceptions->render(function (
+            \Illuminate\Auth\Access\AuthorizationException $e,
+            Request $request
+        ) {
+            return response()->json([
+                'message' => 'You are not authorized to perform this action.',
+            ], 403);
+        });
+
+        // Clean 422 JSON
         $exceptions->render(function (
             \Illuminate\Validation\ValidationException $e,
             Request $request

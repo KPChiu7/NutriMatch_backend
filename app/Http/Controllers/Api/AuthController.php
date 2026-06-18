@@ -67,18 +67,19 @@ class AuthController extends Controller
 
     /**
      * Register a new client account.
+     * Uses new/save pattern to bypass $fillable guard for password.
      */
     public function registerClient(RegisterClientRequest $request): JsonResponse
     {
         $user = DB::transaction(function () use ($request) {
-            $user = User::create([
-                'role'       => 'client',
-                'first_name' => $request->first_name,
-                'last_name'  => $request->last_name,
-                'email'      => $request->email,
-                'password'   => Hash::make($request->password),
-                'phone'      => $request->phone,
-            ]);
+            $user             = new User();
+            $user->role       = 'client';
+            $user->first_name = $request->first_name;
+            $user->last_name  = $request->last_name;
+            $user->email      = $request->email;
+            $user->password   = Hash::make($request->password);
+            $user->phone      = $request->phone;
+            $user->save();
 
             ClientProfile::create([
                 'user_id'       => $user->id,
@@ -109,27 +110,28 @@ class AuthController extends Controller
 
     /**
      * Register a new RND account (pending admin verification).
+     * Uses new/save pattern to bypass $fillable guard for password.
      */
     public function registerRnd(RegisterRndRequest $request): JsonResponse
     {
         $user = DB::transaction(function () use ($request) {
-            $user = User::create([
-                'role'       => 'rnd',
-                'first_name' => $request->first_name,
-                'last_name'  => $request->last_name,
-                'email'      => $request->email,
-                'password'   => Hash::make($request->password),
-                'phone'      => $request->phone,
-            ]);
+            $user             = new User();
+            $user->role       = 'rnd';
+            $user->first_name = $request->first_name;
+            $user->last_name  = $request->last_name;
+            $user->email      = $request->email;
+            $user->password   = Hash::make($request->password);
+            $user->phone      = $request->phone;
+            $user->save();
 
             RndProfile::create([
-                'user_id'             => $user->id,
-                'prc_license_number'  => $request->prc_license_number,
-                'prc_expiry_date'     => $request->prc_expiry_date,
-                'specialization'      => $request->specialization,
-                'consultation_fee'    => $request->consultation_fee,
-                'bio'                 => $request->bio,
-                'is_verified'         => false, // Requires admin approval
+                'user_id'            => $user->id,
+                'prc_license_number' => $request->prc_license_number,
+                'prc_expiry_date'    => $request->prc_expiry_date,
+                'specialization'     => $request->specialization,
+                'consultation_fee'   => $request->consultation_fee,
+                'bio'                => $request->bio,
+                'is_verified'        => false,
             ]);
 
             return $user;
