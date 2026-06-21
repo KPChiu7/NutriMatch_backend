@@ -11,13 +11,20 @@ use Illuminate\Support\Facades\Schedule;
 */
 
 /**
- * Process pending reminders every minute.
+ * Process due reminders every minute.
  * Queries the composite index (is_sent, send_at) for efficiency.
+ *
+ * FIX (this session): previously used Reminder::pending(), which only
+ * checks is_sent=false and ignores send_at entirely — meaning a reminder
+ * scheduled for next week would have been marked sent on the very next
+ * scheduler tick. Now uses Reminder::due(), which additionally requires
+ * send_at <= now(), so only reminders that have actually come due get
+ * processed.
  */
 Schedule::call(function () {
-    $pending = Reminder::pending()->with('client')->get();
+    $due = Reminder::due()->with('client')->get();
 
-    foreach ($pending as $reminder) {
+    foreach ($due as $reminder) {
         // TODO: Dispatch actual notification (email/SMS/push) via notification channel
         // For now, mark as sent and log
         $reminder->update(['is_sent' => true]);

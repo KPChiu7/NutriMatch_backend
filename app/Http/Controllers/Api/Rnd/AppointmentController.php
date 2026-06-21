@@ -6,7 +6,9 @@ use App\Contracts\VideoSessionServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\ConsultationSession;
+use App\Models\Invoice;
 use App\Models\RndClientRelationship;
+use App\Models\SystemSetting;
 use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,9 +32,11 @@ class AppointmentController extends Controller
             'per_page' => 'nullable|integer|min:1|max:50',
         ]);
 
-        $appointments = Appointment::whereHas('relationship', fn($q) =>
-                $q->where('rnd_id', $request->user()->id)
-            )
+        $appointments = Appointment::whereHas(
+            'relationship',
+            fn($q) =>
+            $q->where('rnd_id', $request->user()->id)
+        )
             ->with(['relationship.client', 'preConsultationScreening', 'consultationSession'])
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->orderBy('scheduled_at', 'desc')
@@ -46,9 +50,11 @@ class AppointmentController extends Controller
      */
     public function show(int $id, Request $request): JsonResponse
     {
-        $appointment = Appointment::whereHas('relationship', fn($q) =>
-                $q->where('rnd_id', $request->user()->id)
-            )
+        $appointment = Appointment::whereHas(
+            'relationship',
+            fn($q) =>
+            $q->where('rnd_id', $request->user()->id)
+        )
             ->with([
                 'relationship.client.clientProfile',
                 'relationship.client.clientHealthProfile',
@@ -64,14 +70,29 @@ class AppointmentController extends Controller
 
     /**
      * Confirm a pending appointment. For video appointments, creates the Daily.co room.
+     *
+     * Business rule (added this session): the client MUST have submitted
+     * their pre-consultation screening before the RND is allowed to
+     * confirm. This is checked first, before the appointment status is
+     * touched or any video room is created.
      */
     public function confirm(int $id, Request $request): JsonResponse
     {
-        $appointment = Appointment::whereHas('relationship', fn($q) =>
-                $q->where('rnd_id', $request->user()->id)
-            )
+        $appointment = Appointment::whereHas(
+            'relationship',
+            fn($q) =>
+            $q->where('rnd_id', $request->user()->id)
+        )
             ->where('status', 'pending')
             ->findOrFail($id);
+
+        // NOTE: business rule — RND cannot confirm until the client has
+        // submitted their pre-consultation screening for this appointment.
+        if (! $appointment->preConsultationScreening) {
+            return response()->json([
+                'message' => 'Client has not yet submitted their pre-consultation screening.',
+            ], 422);
+        }
 
         $appointment->update(['status' => 'confirmed']);
 
@@ -108,12 +129,22 @@ class AppointmentController extends Controller
 
     /**
      * Mark an appointment as completed.
+     *
+     * Business rule (added this session): completing an appointment
+     * auto-creates an Invoice for the relationship. The commission
+     * percentage is read from system_settings key
+     * 'billing.default_commission_pct' and frozen onto the invoice row
+     * at creation time — it is NOT retroactively recalculated if the
+     * setting changes later. Invoice amount is taken from the RND's
+     * consultation_fee on rnd_profiles at the time of completion.
      */
     public function complete(int $id, Request $request): JsonResponse
     {
-        $appointment = Appointment::whereHas('relationship', fn($q) =>
-                $q->where('rnd_id', $request->user()->id)
-            )
+        $appointment = Appointment::whereHas(
+            'relationship',
+            fn($q) =>
+            $q->where('rnd_id', $request->user()->id)
+        )
             ->where('status', 'confirmed')
             ->findOrFail($id);
 
@@ -125,9 +156,20 @@ class AppointmentController extends Controller
             'session_ended_at'  => now(),
         ]);
 
-        AuditService::log('appointment.completed', "Appointment #{$appointment->id} marked completed.");
+        $invoice = $this->createInvoiceForAppointment($appointment);
 
-        return response()->json(['message' => 'Appointment marked as completed.']);
+        AuditService::log(
+            'appointment.completed',
+            "Appointment #{$appointment->id} marked completed. Invoice #{$invoice->id} auto-created."
+        );
+
+        // OPTIONAL EXTERNAL API HOOK: email notification to client prompting payment.
+
+        return response()->json([
+            'message'     => 'Appointment marked as completed.',
+            'appointment' => $appointment->fresh(),
+            'invoice'     => $invoice,
+        ]);
     }
 
     /**
@@ -139,9 +181,11 @@ class AppointmentController extends Controller
             'cancellation_reason' => 'required|string|max:500',
         ]);
 
-        $appointment = Appointment::whereHas('relationship', fn($q) =>
-                $q->where('rnd_id', $request->user()->id)
-            )
+        $appointment = Appointment::whereHas(
+            'relationship',
+            fn($q) =>
+            $q->where('rnd_id', $request->user()->id)
+        )
             ->whereIn('status', ['pending', 'confirmed'])
             ->findOrFail($id);
 
@@ -153,5 +197,30 @@ class AppointmentController extends Controller
         AuditService::log('appointment.cancelled', "RND cancelled appointment #{$appointment->id}: {$request->cancellation_reason}");
 
         return response()->json(['message' => 'Appointment cancelled.']);
+    }
+
+    /**
+     * Build and persist the Invoice for a just-completed appointment.
+     * Commission percentage is read from system_settings and frozen onto
+     * the invoice row. Amount is taken from the RND's current
+     * consultation_fee on their rnd_profiles record.
+     */
+    private function createInvoiceForAppointment(Appointment $appointment): Invoice
+    {
+        $relationship = $appointment->relationship()->with('rnd.rndProfile')->first();
+
+        $commissionPct = (float) SystemSetting::getValue('billing.default_commission_pct', 10.00);
+
+        $amount = (float) ($relationship->rnd->rndProfile->consultation_fee ?? 0);
+        $commissionAmt = round($amount * ($commissionPct / 100), 2);
+
+        return Invoice::create([
+            'relationship_id' => $relationship->id,
+            'appointment_id'  => $appointment->id,
+            'amount'          => $amount,
+            'commission_pct'  => $commissionPct,
+            'commission_amt'  => $commissionAmt,
+            'status'          => 'unpaid',
+        ]);
     }
 }
