@@ -50,8 +50,8 @@ return new class extends Migration
             $table->fullText(['name', 'local_name']);
 
             $table->foreign('category_id')
-                  ->references('id')->on('food_exchange_categories')
-                  ->onDelete('cascade');
+                ->references('id')->on('food_exchange_categories')
+                ->onDelete('cascade');
         });
 
         // --------------------------------------------------------
@@ -77,8 +77,8 @@ return new class extends Migration
             $table->index('relationship_id');
 
             $table->foreign('relationship_id')
-                  ->references('id')->on('rnd_client_relationships')
-                  ->onDelete('restrict');
+                ->references('id')->on('rnd_client_relationships')
+                ->onDelete('restrict');
         });
 
         // --------------------------------------------------------
@@ -100,8 +100,8 @@ return new class extends Migration
             $table->unique(['meal_plan_id', 'meal_time']);
 
             $table->foreign('meal_plan_id')
-                  ->references('id')->on('meal_plans')
-                  ->onDelete('cascade');
+                ->references('id')->on('meal_plans')
+                ->onDelete('cascade');
         });
 
         // --------------------------------------------------------
@@ -123,11 +123,11 @@ return new class extends Migration
             $table->index('source_type');
 
             $table->foreign('meal_plan_meal_id')
-                  ->references('id')->on('meal_plan_meals')
-                  ->onDelete('cascade');
+                ->references('id')->on('meal_plan_meals')
+                ->onDelete('cascade');
             $table->foreign('food_item_id')
-                  ->references('id')->on('food_exchange_items')
-                  ->onDelete('set null');
+                ->references('id')->on('food_exchange_items')
+                ->onDelete('set null');
         });
 
         // --------------------------------------------------------
@@ -152,11 +152,11 @@ return new class extends Migration
             $table->index('deleted_at');
 
             $table->foreign('relationship_id')
-                  ->references('id')->on('rnd_client_relationships')
-                  ->onDelete('restrict');
+                ->references('id')->on('rnd_client_relationships')
+                ->onDelete('restrict');
             $table->foreign('sender_id')
-                  ->references('id')->on('users')
-                  ->onDelete('restrict');
+                ->references('id')->on('users')
+                ->onDelete('restrict');
         });
 
         // --------------------------------------------------------
@@ -177,8 +177,8 @@ return new class extends Migration
             $table->index('is_active');
 
             $table->foreign('uploaded_by')
-                  ->references('id')->on('users')
-                  ->onDelete('restrict');
+                ->references('id')->on('users')
+                ->onDelete('restrict');
         });
 
         // --------------------------------------------------------
@@ -187,6 +187,7 @@ return new class extends Migration
         Schema::create('reminders', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('client_id');
+            $table->unsignedBigInteger('created_by')->nullable();
             $table->string('title', 255);
             $table->text('message')->nullable();
             $table->enum('type', ['appointment', 'meal_log', 'medication', 'general'])->default('general');
@@ -195,11 +196,16 @@ return new class extends Migration
             $table->timestamp('created_at')->useCurrent();
 
             $table->index('client_id');
-            $table->index(['is_sent', 'send_at']); // Optimizes scheduler query
+            $table->index('created_by');
+            $table->index(['is_sent', 'send_at']);
 
             $table->foreign('client_id')
-                  ->references('id')->on('users')
-                  ->onDelete('cascade');
+                ->references('id')->on('users')
+                ->onDelete('cascade');
+
+            $table->foreign('created_by')
+                ->references('id')->on('users')
+                ->onDelete('set null');
         });
 
         // --------------------------------------------------------
@@ -224,8 +230,8 @@ return new class extends Migration
             $table->index(['notifiable_type', 'notifiable_id']);
 
             $table->foreign('recipient_id')
-                  ->references('id')->on('users')
-                  ->onDelete('cascade');
+                ->references('id')->on('users')
+                ->onDelete('cascade');
         });
 
         // --------------------------------------------------------
@@ -252,11 +258,11 @@ return new class extends Migration
             $table->index('status');
 
             $table->foreign('relationship_id')
-                  ->references('id')->on('rnd_client_relationships')
-                  ->onDelete('restrict');
+                ->references('id')->on('rnd_client_relationships')
+                ->onDelete('restrict');
             $table->foreign('appointment_id')
-                  ->references('id')->on('appointments')
-                  ->onDelete('set null');
+                ->references('id')->on('appointments')
+                ->onDelete('set null');
         });
 
         // --------------------------------------------------------
@@ -283,8 +289,8 @@ return new class extends Migration
             $table->index('status');
 
             $table->foreign('invoice_id')
-                  ->references('id')->on('invoices')
-                  ->onDelete('restrict');
+                ->references('id')->on('invoices')
+                ->onDelete('restrict');
         });
 
         // --------------------------------------------------------
@@ -301,11 +307,11 @@ return new class extends Migration
             $table->index('relationship_id');
 
             $table->foreign('relationship_id')
-                  ->references('id')->on('rnd_client_relationships')
-                  ->onDelete('restrict');
+                ->references('id')->on('rnd_client_relationships')
+                ->onDelete('restrict');
             $table->foreign('appointment_id')
-                  ->references('id')->on('appointments')
-                  ->onDelete('cascade');
+                ->references('id')->on('appointments')
+                ->onDelete('cascade');
         });
 
         // --------------------------------------------------------
@@ -323,8 +329,8 @@ return new class extends Migration
             $table->index(['action', 'created_at']);
 
             $table->foreign('user_id')
-                  ->references('id')->on('users')
-                  ->onDelete('set null');
+                ->references('id')->on('users')
+                ->onDelete('set null');
         });
 
         // --------------------------------------------------------
@@ -358,8 +364,8 @@ return new class extends Migration
             $table->index('updated_by');
 
             $table->foreign('updated_by')
-                  ->references('id')->on('users')
-                  ->onDelete('set null');
+                ->references('id')->on('users')
+                ->onDelete('set null');
         });
 
         // --------------------------------------------------------
