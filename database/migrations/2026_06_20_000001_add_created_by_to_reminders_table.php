@@ -18,11 +18,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('reminders', function (Blueprint $table) {
-            $table->unsignedBigInteger('created_by')->nullable()->after('client_id');
+            $table->unsignedInteger('created_by')->nullable()->after('client_id');
 
             $table->foreign('created_by')
-                  ->references('id')->on('users')
-                  ->onDelete('set null');
+                ->references('id')->on('users')
+                ->onDelete('set null');
 
             $table->index('created_by');
         });
